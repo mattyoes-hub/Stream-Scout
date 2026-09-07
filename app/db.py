@@ -6,11 +6,37 @@ from typing import Any, Iterable
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if DATABASE_URL.startswith("postgresql+psycopg://"):
     DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgresql+psycopg://"):]
 DB_SCHEMA = os.getenv("DB_SCHEMA", "stream_scout").strip() or "stream_scout"
+
+
+_pool: ConnectionPool | None = None
+
+
+def _configure_connection(conn: psycopg.Connection) -> None:
+    conn.row_factory = dict_row
+    conn.execute(f'SET search_path TO "{DB_SCHEMA}", public')
+
+
+def _pool_instance() -> ConnectionPool:
+    global _pool
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not configured")
+    if _pool is None:
+        _pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=6,
+            timeout=10,
+            max_idle=300,
+            configure=_configure_connection,
+            open=True,
+        )
+    return _pool
 
 
 class CursorAdapter:
@@ -26,10 +52,9 @@ class CursorAdapter:
 
 class ConnectionAdapter(AbstractContextManager):
     def __init__(self):
-        if not DATABASE_URL:
-            raise RuntimeError("DATABASE_URL is not configured")
-        self._conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
-        self._conn.execute(f'SET search_path TO "{DB_SCHEMA}", public')
+        self._pool = _pool_instance()
+        self._ctx = self._pool.connection()
+        self._conn = self._ctx.__enter__()
 
     @staticmethod
     def _translate(sql: str) -> str:
@@ -50,14 +75,18 @@ class ConnectionAdapter(AbstractContextManager):
         self._conn.rollback()
 
     def close(self) -> None:
-        self._conn.close()
+        if self._ctx is not None:
+            self._ctx.__exit__(None, None, None)
+            self._ctx = None
 
     def __exit__(self, exc_type, exc, tb):
         if exc_type is None:
             self._conn.commit()
         else:
             self._conn.rollback()
-        self._conn.close()
+        if self._ctx is not None:
+            self._ctx.__exit__(exc_type, exc, tb)
+            self._ctx = None
         return False
 
 
@@ -159,12 +188,9 @@ def init_db() -> None:
         checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     '''
-    raw = psycopg.connect(DATABASE_URL)
-    try:
+    with _pool_instance().connection() as raw:
         raw.execute(ddl)
         raw.commit()
-    finally:
-        raw.close()
 
     with connect() as conn:
         conn.execute("INSERT INTO profiles(name,emoji,display_order) VALUES('Matt','😎',1) ON CONFLICT(name) DO NOTHING")
