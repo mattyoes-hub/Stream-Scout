@@ -6,7 +6,7 @@ ROOT = Path('/app')
 # ---- Backend: make rental browsing cheap and make detail "where to watch" useful ----
 mp = ROOT / 'app' / 'main.py'
 s = mp.read_text()
-s = re.sub(r'BUILD_VERSION = "[^"]+"', 'BUILD_VERSION = "2.6.0-cloud"', s, count=1)
+s = re.sub(r'BUILD_VERSION = "[^"]+"', 'BUILD_VERSION = "2.6.1-cloud"', s, count=1)
 
 # Rental Discover is already filtered by TMDB's rent monetization type. Do not make
 # one extra watch-provider request per card before the grid can render. Provider
@@ -28,7 +28,7 @@ if old in s:
 
 mp.write_text(s)
 
-# ---- TMDB: short-lived response cache to eliminate repeat network work ----
+# ---- TMDB: short-lived response cache + persistent keep-alive client ----
 tp = ROOT / 'app' / 'tmdb.py'
 t = tp.read_text()
 if 'import time\n' not in t:
@@ -43,6 +43,6 @@ if '_response_cache:' not in t:
 
 get_start = t.index('async def get(path: str, params: dict[str, Any] | None = None)')
 get_end = t.index('\n\nasync def providers', get_start)
-get_impl = '''async def get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:\n    language = os.getenv("LANGUAGE", "en-US")\n    params = {"language": language, **(params or {})}\n    key = (path, tuple(sorted((str(k), str(v)) for k, v in params.items())))\n    now = time.monotonic()\n    cached = _response_cache.get(key)\n    if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:\n        return cached[1]\n    try:\n        async with httpx.AsyncClient(\n            timeout=httpx.Timeout(20.0, connect=5.0),\n            headers=_headers(),\n        ) as client:\n            res = await client.get(f"{BASE}{path}", params=params)\n    except httpx.HTTPError as e:\n        raise TMDBError(f"TMDB network error: {e}") from e\n    if res.status_code >= 400:\n        raise TMDBError(f"TMDB returned {res.status_code}: {res.text[:200]}")\n    data = res.json()\n    if len(_response_cache) >= _CACHE_MAX_ITEMS:\n        _response_cache.clear()\n    _response_cache[key] = (now, data)\n    return data\n'''
+get_impl = '''async def get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:\n    language = os.getenv("LANGUAGE", "en-US")\n    params = {"language": language, **(params or {})}\n    key = (path, tuple(sorted((str(k), str(v)) for k, v in params.items())))\n    now = time.monotonic()\n    cached = _response_cache.get(key)\n    if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:\n        return cached[1]\n    try:\n        res = await _client_instance().get(f"{BASE}{path}", params=params)\n    except httpx.HTTPError as e:\n        raise TMDBError(f"TMDB network error: {e}") from e\n    if res.status_code >= 400:\n        raise TMDBError(f"TMDB returned {res.status_code}: {res.text[:200]}")\n    data = res.json()\n    if len(_response_cache) >= _CACHE_MAX_ITEMS:\n        _response_cache.clear()\n    _response_cache[key] = (now, data)\n    return data\n'''
 t = t[:get_start] + get_impl + t[get_end:]
 tp.write_text(t)
