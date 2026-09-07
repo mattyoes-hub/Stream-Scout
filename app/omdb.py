@@ -5,11 +5,22 @@ from typing import Any
 import httpx
 
 BASE = "https://www.omdbapi.com/"
+_client: httpx.AsyncClient | None = None
 
 
 def configured() -> bool:
     key = os.getenv("OMDB_API_KEY", "").strip()
     return bool(key) and key != "paste_your_omdb_api_key_here"
+
+
+def _client_instance() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(8.0, connect=4.0),
+            limits=httpx.Limits(max_connections=24, max_keepalive_connections=12, keepalive_expiry=30.0),
+        )
+    return _client
 
 
 def _parse(data: dict[str, Any]) -> dict[str, Any]:
@@ -49,8 +60,7 @@ async def lookup(imdb_id: str | None = None, title: str | None = None, year: str
     else:
         return {"ok": False, "status": "no_identifier", "error": "No IMDb ID or title available."}
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(BASE, params=params)
+        r = await _client_instance().get(BASE, params=params)
     except Exception as e:
         return {"ok": False, "status": "network_error", "error": str(e)}
     if r.status_code >= 400:
