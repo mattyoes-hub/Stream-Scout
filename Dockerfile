@@ -23,13 +23,24 @@ s = s.replace(
 )
 p.write_text(s)
 
-lines = s.splitlines()
-for i, line in enumerate(lines):
-    if 'ratings-batch' in line or 'ratings_batch' in line or 'match-batch' in line or 'match_batch' in line:
-        lo=max(0,i-8); hi=min(len(lines),i+35)
-        print(f'--- main.py lines {lo+1}-{hi} ---')
-        for n in range(lo,hi):
-            print(f'{n+1}: {lines[n]}')
+# Temporary build-time inspection of frontend patch points.
+for fp in [Path('/app/app/static/app.js'), Path('/app/app/static/index.html')]:
+    if not fp.exists():
+        continue
+    txt = fp.read_text(errors='ignore')
+    print(f'=== FRONTEND FILE {fp} chars={len(txt)} ===')
+    needles = ['ratings-batch','match-batch','/api/discover','content_rating','smart_genre','Clear Filters','Tonight','Surprise','Rent','filter','renderCards','loadRatings']
+    for needle in needles:
+        start = 0
+        hits = 0
+        while True:
+            i = txt.find(needle, start)
+            if i < 0 or hits >= 4:
+                break
+            lo=max(0,i-700); hi=min(len(txt),i+1300)
+            print(f'--- {fp.name} needle={needle} at={i} ---')
+            print(txt[lo:hi])
+            start=i+len(needle); hits += 1
 
 p = Path('/app/app/db.py')
 s = p.read_text()
