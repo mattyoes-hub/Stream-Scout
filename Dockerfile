@@ -2,6 +2,7 @@ FROM python:3.13-slim
 
 WORKDIR /app
 COPY payload /tmp/payload
+COPY app /src/app
 
 RUN cat /tmp/payload/part* | base64 -d > /tmp/stream-scout-cloud.zip && \
     python - <<'PY'
@@ -10,38 +11,15 @@ import zipfile
 z = Path('/tmp/stream-scout-cloud.zip')
 with zipfile.ZipFile(z) as f:
     f.extractall('/app')
+PY
 
-p = Path('/app/app/main.py')
-s = p.read_text()
-s = s.replace(
-    'watched_date=(row.get("updated_at") or "")[:10]',
-    'watched_raw=row.get("updated_at"); watched_date=(watched_raw.date().isoformat() if hasattr(watched_raw, "date") else str(watched_raw or "")[:10])'
-)
-s = s.replace(
-    '@app.get("/api/health")\ndef health():',
-    '@app.get("/health")\ndef railway_health():\n    return {"ok": True}\n\n\n@app.get("/api/health")\ndef health():'
-)
-p.write_text(s)
-
-# Temporary build-time inspection of frontend patch points.
-for fp in [Path('/app/app/static/app.js'), Path('/app/app/static/index.html')]:
-    if not fp.exists():
-        continue
-    txt = fp.read_text(errors='ignore')
-    print(f'=== FRONTEND FILE {fp} chars={len(txt)} ===')
-    needles = ['ratings-batch','match-batch','/api/discover','content_rating','smart_genre','Clear Filters','Tonight','Surprise','Rent','filter','renderCards','loadRatings']
-    for needle in needles:
-        start = 0
-        hits = 0
-        while True:
-            i = txt.find(needle, start)
-            if i < 0 or hits >= 4:
-                break
-            lo=max(0,i-700); hi=min(len(txt),i+1300)
-            print(f'--- {fp.name} needle={needle} at={i} ---')
-            print(txt[lo:hi])
-            start=i+len(needle); hits += 1
-
+# Prefer maintainable source files from the repository for API integrations,
+# then apply the cloud/runtime/UI patch in one normal Python source file.
+RUN cp /src/app/tmdb.py /app/app/tmdb.py && \
+    cp /src/app/omdb.py /app/app/omdb.py && \
+    python /src/app/cloud_patch.py && \
+    python - <<'PY'
+from pathlib import Path
 p = Path('/app/app/db.py')
 s = p.read_text()
 s = s.replace(
