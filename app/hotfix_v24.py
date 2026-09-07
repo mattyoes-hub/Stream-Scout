@@ -25,6 +25,14 @@ if '@app.get("/health")' not in s:
     anchor = '@app.get("/api/health")'
     if anchor in s:
         s = s.replace(anchor, '@app.get("/health")\n' + anchor, 1)
+
+# Internal card-path smoke check: perform the same TMDB sequence used by cards --
+# discover, then fetch complete details for a returned title.
+if '@app.get("/api/smoke_cards")' not in s:
+    anchor = '@app.get("/api/search")'
+    smoke = '''@app.get("/api/smoke_cards")\nasync def smoke_cards():\n    import time\n    t0 = time.perf_counter()\n    data = await tmdb.discover("movie", selected_provider_ids(), days=60, page=1)\n    rows = data.get("results", [])\n    if not rows:\n        raise HTTPException(500, "TMDB discover returned no titles")\n    item = rows[0]\n    detail = await tmdb.details("movie", int(item["id"]))\n    if not detail.get("id") or not (detail.get("title") or detail.get("name")):\n        raise HTTPException(500, "TMDB detail response was incomplete")\n    return {"ok": True, "tmdb_id": detail.get("id"), "title": detail.get("title") or detail.get("name"), "seconds": round(time.perf_counter()-t0, 3)}\n\n\n'''
+    if anchor in s:
+        s = s.replace(anchor, smoke + anchor, 1)
 mp.write_text(s)
 
 # Cards should render first. Ratings/match enrichment is secondary and must not
