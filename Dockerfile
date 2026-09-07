@@ -14,11 +14,12 @@ with zipfile.ZipFile(z) as f:
 PY
 
 # Prefer maintainable source files from the repository for API integrations,
-# then apply the cloud/runtime/UI patch in normal Python source files.
+# then apply the cloud/runtime/UI patches in normal Python source files.
 RUN cp /src/app/tmdb.py /app/app/tmdb.py && \
     cp /src/app/omdb.py /app/app/omdb.py && \
     python /src/app/cloud_patch.py && \
     python /src/app/hotfix_v24.py && \
+    python /src/app/hotfix_v25.py && \
     python - <<'PY'
 from pathlib import Path
 p = Path('/app/app/db.py')
