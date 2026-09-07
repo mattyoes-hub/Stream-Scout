@@ -21,6 +21,7 @@ RUN cp /src/app/tmdb.py /app/app/tmdb.py && \
     python /src/app/hotfix_v24.py && \
     python /src/app/hotfix_v25.py && \
     python /src/app/hotfix_v26.py && \
+    python /src/app/hotfix_v27.py && \
     python - <<'PY'
 from pathlib import Path
 p = Path('/app/app/db.py')
