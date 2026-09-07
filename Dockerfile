@@ -24,6 +24,15 @@ s = s.replace(
 )
 p.write_text(s)
 
+# Build-time trace for discover/filter plumbing; safe to remove after diagnosis.
+lines = s.splitlines()
+for i, line in enumerate(lines):
+    if 'def discover' in line or 'smart_genre' in line or 'content_rating' in line or 'tmdb.discover' in line:
+        lo=max(0,i-5); hi=min(len(lines),i+10)
+        print(f'--- main.py lines {lo+1}-{hi} ---')
+        for n in range(lo,hi):
+            print(f'{n+1}: {lines[n]}')
+
 # Menu Planner's Railway DATABASE_URL uses SQLAlchemy's postgresql+psycopg scheme.
 # psycopg.connect expects a plain PostgreSQL scheme.
 p = Path('/app/app/db.py')
