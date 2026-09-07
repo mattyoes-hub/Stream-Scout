@@ -39,6 +39,13 @@ if '/api/smoke_v24' not in s:
     p.write_text(s)
 PY
 
+# Production browser bundle must at least parse before Railway is allowed to deploy it.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    node --check /app/app/static/app.js && \
+    apt-get purge -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENV PYTHONUNBUFFERED=1
