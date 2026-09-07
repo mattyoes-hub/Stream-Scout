@@ -18,6 +18,10 @@ s = s.replace(
     'watched_date=(row.get("updated_at") or "")[:10]',
     'watched_raw=row.get("updated_at"); watched_date=(watched_raw.date().isoformat() if hasattr(watched_raw, "date") else str(watched_raw or "")[:10])'
 )
+s = s.replace(
+    '@app.get("/api/health")\ndef health():',
+    '@app.get("/health")\ndef railway_health():\n    return {"ok": True}\n\n\n@app.get("/api/health")\ndef health():'
+)
 p.write_text(s)
 
 # Menu Planner's Railway DATABASE_URL uses SQLAlchemy's postgresql+psycopg scheme.
