@@ -18,6 +18,13 @@ mp = ROOT / 'app' / 'main.py'
 s = mp.read_text()
 s = s.replace('asyncio.Semaphore(12)', 'asyncio.Semaphore(4)')
 s = s.replace('payload[:20]', 'payload[:10]')
+
+# Accept either Railway healthcheck path. /api/health remains the canonical route,
+# while /health is a lightweight compatibility alias for older deployment snapshots.
+if '@app.get("/health")' not in s:
+    anchor = '@app.get("/api/health")'
+    if anchor in s:
+        s = s.replace(anchor, '@app.get("/health")\n' + anchor, 1)
 mp.write_text(s)
 
 # Cards should render first. Ratings/match enrichment is secondary and must not
