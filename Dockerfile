@@ -1,9 +1,10 @@
 FROM python:3.13-slim
 
 WORKDIR /app
-COPY stream-scout-cloud.zip /tmp/stream-scout-cloud.zip
+COPY payload /tmp/payload
 
-RUN python - <<'PY'
+RUN cat /tmp/payload/part* | base64 -d > /tmp/stream-scout-cloud.zip && \
+    python - <<'PY'
 from pathlib import Path
 import zipfile
 z = Path('/tmp/stream-scout-cloud.zip')
