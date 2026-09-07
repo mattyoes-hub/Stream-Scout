@@ -14,10 +14,11 @@ with zipfile.ZipFile(z) as f:
 PY
 
 # Prefer maintainable source files from the repository for API integrations,
-# then apply the cloud/runtime/UI patch in one normal Python source file.
+# then apply the cloud/runtime/UI patch in normal Python source files.
 RUN cp /src/app/tmdb.py /app/app/tmdb.py && \
     cp /src/app/omdb.py /app/app/omdb.py && \
     python /src/app/cloud_patch.py && \
+    python /src/app/hotfix_v24.py && \
     python - <<'PY'
 from pathlib import Path
 p = Path('/app/app/db.py')
@@ -28,7 +29,7 @@ s = s.replace(
 )
 p.write_text(s)
 
-# Internal QA endpoint used by Railway for one deployment smoke test.
+# Internal QA endpoint retained for targeted verification.
 p = Path('/app/app/main.py')
 s = p.read_text()
 if '/api/smoke_v24' not in s:
