@@ -8,6 +8,8 @@ import psycopg
 from psycopg.rows import dict_row
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL.startswith("postgresql+psycopg://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgresql+psycopg://"):]
 DB_SCHEMA = os.getenv("DB_SCHEMA", "stream_scout").strip() or "stream_scout"
 
 
