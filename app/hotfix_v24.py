@@ -36,9 +36,10 @@ if '@app.get("/api/smoke_cards")' not in s:
 mp.write_text(s)
 
 # Cards should render first. Ratings/match enrichment is secondary and must not
-# stampede TMDB while the user is browsing.
+# stampede TMDB while the user is browsing. Only replace invocation sites; never
+# rewrite the hydrateMatch function declaration itself.
 jp = ROOT / 'app' / 'static' / 'app.js'
 js = jp.read_text()
 js = js.replace('hydrateRatings(items.slice(0,20))', 'hydrateRatings(items.slice(0,10))')
-js = js.replace('hydrateMatch(items)', 'hydrateMatch(items.slice(0,10))')
+js = js.replace('setTimeout(()=>hydrateMatch(items),0)', 'setTimeout(()=>hydrateMatch(items.slice(0,10)),0)')
 jp.write_text(js)
