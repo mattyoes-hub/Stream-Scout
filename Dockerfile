@@ -11,7 +11,6 @@ z = Path('/tmp/stream-scout-cloud.zip')
 with zipfile.ZipFile(z) as f:
     f.extractall('/app')
 
-# PostgreSQL returns timestamptz values as datetime objects rather than strings.
 p = Path('/app/app/main.py')
 s = p.read_text()
 s = s.replace(
@@ -24,17 +23,14 @@ s = s.replace(
 )
 p.write_text(s)
 
-# Build-time trace for discover/filter plumbing; safe to remove after diagnosis.
 lines = s.splitlines()
 for i, line in enumerate(lines):
-    if 'def discover' in line or 'smart_genre' in line or 'content_rating' in line or 'tmdb.discover' in line:
-        lo=max(0,i-5); hi=min(len(lines),i+10)
+    if 'ratings-batch' in line or 'ratings_batch' in line or 'match-batch' in line or 'match_batch' in line:
+        lo=max(0,i-8); hi=min(len(lines),i+35)
         print(f'--- main.py lines {lo+1}-{hi} ---')
         for n in range(lo,hi):
             print(f'{n+1}: {lines[n]}')
 
-# Menu Planner's Railway DATABASE_URL uses SQLAlchemy's postgresql+psycopg scheme.
-# psycopg.connect expects a plain PostgreSQL scheme.
 p = Path('/app/app/db.py')
 s = p.read_text()
 s = s.replace(
